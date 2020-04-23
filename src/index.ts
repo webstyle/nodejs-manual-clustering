@@ -1,13 +1,12 @@
 import { ServerHandler } from "./service";
-import { TransportTypes } from "./types";
 
 process.env.NODE_ENV = 'production';
+const HTTP_PORT = Number(process.env.HTTP_PORT) || 1337;
 
 const app = new ServerHandler({
     transport: {
         isPermanentConnection: true,
-        port: 1337,
-        type: TransportTypes.http
+        port: HTTP_PORT,
     },
     cluster: {
         replicas: 6

@@ -2,9 +2,10 @@ version: '3.4'
 
 services:
   nodejs-test:
-    image: nodejs-test
+    image: nodejs-manual-clustering
     build: .
     environment:
       NODE_ENV: production
+      HTTP_PORT: 80
     ports:
-      - 80
+      - "1337:80"

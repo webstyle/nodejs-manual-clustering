@@ -1,3 +1,6 @@
+import exp = require("constants");
+import {ChildProcess} from "child_process";
+
 export enum HTTP_METHODS {
     get = 'GET',
     post = 'POST',
@@ -12,15 +15,9 @@ export interface ParsedRequest {
     method: HTTP_METHODS | string;
 }
 
-export enum TransportTypes {
-    http = 'HTTP',
-    tcp = 'TCP'
-}
-
 export interface ITransport {
     isPermanentConnection: boolean;
     port: number;
-    type: TransportTypes
 }
 
 export interface IServerHandlerOptions {
@@ -30,4 +27,9 @@ export interface IServerHandlerOptions {
 
 export interface ICluster {
     replicas?: number;
+}
+
+export interface IRandomWorker {
+    worker: ChildProcess;
+    index: number;
 }

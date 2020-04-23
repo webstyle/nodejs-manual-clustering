@@ -18,14 +18,13 @@ import {
     ServerResponse
 } from 'http';
 import { ChildProcess, fork } from 'child_process';
-import { join } from 'path'
+import { join } from 'path';
 
 import {
-    ICluster,
+    ICluster, IRandomWorker,
     IServerHandlerOptions,
     ITransport,
     ParsedRequest,
-    TransportTypes
 } from "./types";
 
 
@@ -61,39 +60,45 @@ export class ServerHandler {
         // If application is not master
         if (!this.isMaster) {
             await this.startWorker();
-            if(!this.transport.isPermanentConnection) {
+            if (!this.transport.isPermanentConnection) {
                 await this.startTransport();
             }
         }
 
         // if application is master and cluster mode enabled
         await this.startCluster();
-        if(this.transport.isPermanentConnection) {
+        if (this.transport.isPermanentConnection) {
             await this.startTransport();
         }
     }
 
     async startTransport() {
-        //todo: tcp/ws
-        if (this.transport.type === TransportTypes.http) {
-            this.server = createServer((req: IncomingMessage, res: ServerResponse) => {
-                res.statusCode = 200;
+        this.server = createServer((req: IncomingMessage, res: ServerResponse) => {
+            res.statusCode = 200;
 
-                const worker: ChildProcess = this.getRandomWorker();
+            const { worker, index }: IRandomWorker = this.getRandomWorker();
 
-                const handlerParams: ParsedRequest = {
-                    headers: req.headers,
-                    method: req.method,
-                    url: req.url
-                };
+            const handlerParams: ParsedRequest = {
+                headers: req.headers,
+                method: req.method,
+                url: req.url
+            };
 
-                worker.send(JSON.stringify(handlerParams));
+            worker.send(JSON.stringify(handlerParams));
 
-                worker.on('message', (response) => {
-                    res.end(response);
-                });
+            worker.once('message', (response) => {
+                res.end(response);
             });
-        }
+
+            worker.once('error', (response) => {
+                res.end(response);
+            });
+
+            // Disconnecting workers
+            worker.once('close', () => this.disconnetWorker({ worker, index }));
+            worker.once('exit', () => this.disconnetWorker({ worker, index }));
+            worker.once('disconnect', () => this.disconnetWorker({ worker, index }));
+        });
 
         this.server.listen(this.transport.port, () => {
             console.log(`server is run on port ${this.transport.port}`);
@@ -101,8 +106,7 @@ export class ServerHandler {
     }
 
     async startWorker() {
-        // todo: Problem with ts extension. After building i wil replace the file
-        const childProcess = fork( 'src/handler.js');
+        const childProcess = fork(join(__dirname + '/handler.js'));
         this.workers.push(childProcess);
         console.log(`Worker ${childProcess.pid} is online`);
 
@@ -116,9 +120,15 @@ export class ServerHandler {
         }
     }
 
-    getRandomWorker(): ChildProcess {
+    private disconnetWorker(options: IRandomWorker) {
+        options.worker.kill();
+        this.workers.splice(options.index, 1);
+        console.log(`worker ${options.worker.pid} closed`);
+    }
+
+    private getRandomWorker(): IRandomWorker {
         const randomIndex = Math.round(Math.random() * (this.workers.length - 1));
-        return this.workers[randomIndex];
+        return {worker: this.workers[randomIndex], index: randomIndex};
     }
 }
 
